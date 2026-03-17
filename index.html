@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>JazzCash DFS KPI Dashboard</title>
+<!-- PWA / iPhone App -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JazzCash KPI">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFC000">
+<link rel="apple-touch-icon" id="touchIcon">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --gold:#FFC000;
+  --gold-dim:rgba(255,192,0,.18);
+  --gold-mid:rgba(255,192,0,.35);
+  --gold-border:rgba(255,192,0,.3);
+  --surface:#F2F2F2;
+  --bg:#2c2c2c;
+  --card:#383838;
+  --card2:#444444;
+  --muted:rgba(242,242,242,.55);
+  --muted2:rgba(242,242,242,.3);
+  --green:#4caf7d;
+  --red:#f07070;
+}
+*{box-sizing:border-box;}
+body{background:var(--bg);color:var(--surface);font-family:'Segoe UI',sans-serif;margin:0;}
+
+/* ── HEADER ── */
+.dash-header{
+  background:linear-gradient(135deg,#333333 0%,#3d3200 100%);
+  border-bottom:3px solid var(--gold);
+  padding:1rem 0;
+}
+.dash-title{color:var(--gold);font-size:1.6rem;font-weight:700;letter-spacing:1px;}
+.dash-subtitle{color:var(--muted);font-size:.85rem;}
+
+/* ── CARDS / SECTIONS ── */
+.section-card{
+  background:var(--card);
+  border-radius:12px;padding:1.25rem;margin-bottom:1.25rem;
+  border:1px solid var(--gold-border);
+}
+.section-title{
+  font-size:.9rem;font-weight:700;color:var(--gold);
+  text-transform:uppercase;letter-spacing:1px;
+  margin-bottom:1rem;border-bottom:1px solid var(--gold-border);padding-bottom:.5rem;
+}
+.inner-card{background:var(--card2);border-radius:8px;padding:1rem;}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{
+  background:var(--card2);border:2px dashed rgba(255,192,0,.3);
+  border-radius:12px;padding:1.5rem;transition:border-color .3s;
+}
+.upload-zone.loaded{border-color:var(--green);border-style:solid;}
+.upload-zone .label{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.4rem;}
+.upload-zone .month-name{font-size:1rem;font-weight:600;color:var(--gold);min-height:1.4rem;}
+
+/* ── KPI CARDS ── */
+.kpi-card{
+  background:var(--card2);border-radius:10px;padding:1rem;
+  text-align:center;border:1px solid var(--gold-border);
+}
+.kpi-label{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem;}
+.kpi-value{font-size:1.5rem;font-weight:700;color:var(--surface);line-height:1.2;}
+.kpi-value.sm{font-size:1.1rem;}
+
+/* ── DELTA BADGES ── */
+.bdelta{font-size:.7rem;padding:2px 7px;border-radius:20px;font-weight:600;}
+.bup{background:rgba(76,175,109,.18);color:var(--green);}
+.bdn{background:rgba(240,112,112,.18);color:var(--red);}
+.bfl{background:rgba(255,192,0,.18);color:var(--gold);}
+
+/* ── BUTTONS / TOGGLES ── */
+.tbtn{
+  font-size:.78rem;padding:4px 14px;
+  background:var(--card2);border:1px solid var(--gold-border);
+  color:var(--muted);border-radius:4px;cursor:pointer;transition:all .15s;
+}
+.tbtn:hover{border-color:var(--gold);color:var(--surface);}
+.tbtn.active{background:var(--gold);border-color:var(--gold);color:#141414;font-weight:700;}
+.fbtn{
+  background:var(--card2);color:var(--gold);
+  border:1px solid var(--gold-border);border-radius:6px;
+  padding:6px 14px;font-size:.8rem;cursor:pointer;display:inline-block;transition:background .15s;
+}
+.fbtn:hover{background:#2e2800;}
+#renderBtn{background:var(--gold);color:#141414;border:none;font-weight:700;border-radius:6px;padding:6px 16px;font-size:.85rem;cursor:pointer;}
+#renderBtn:hover{background:#e6ac00;}
+#renderBtn:disabled{background:#555;color:#888;cursor:not-allowed;}
+
+/* ── TABLE ── */
+.mom-table{font-size:.8rem;}
+.mom-table th{background:#2a2600;color:var(--gold);font-weight:600;text-transform:uppercase;font-size:.68rem;white-space:nowrap;border-color:var(--gold-border);}
+.mom-table td{vertical-align:middle;border-color:rgba(255,192,0,.1);color:var(--surface);}
+.mom-table tr:hover td{background:var(--gold-dim);}
+.dpos{color:var(--green);font-weight:600;}
+.dneg{color:var(--red);font-weight:600;}
+.dflat{color:var(--gold);}
+
+/* ── MISC ── */
+.chart-container{position:relative;}
+#dashMain{display:none;}
+#dashMain.visible{display:block;}
+.fwrap{position:relative;}
+.fwrap input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.pbar{height:3px;background:var(--gold);border-radius:2px;transition:width .3s;}
+select.ds{
+  background:var(--card2);color:var(--surface);
+  border:1px solid var(--gold-border);border-radius:6px;
+  padding:4px 10px;font-size:.82rem;
+}
+select.ds option{background:var(--card);}
+.catbadge{display:inline-block;font-size:.66rem;background:var(--gold-dim);color:var(--gold);border-radius:4px;padding:1px 6px;margin-right:4px;border:1px solid var(--gold-border);}
+canvas{max-height:320px;}
+
+/* ── INSIGHTS ── */
+.ins-section{margin-bottom:1rem;}
+.ins-header{
+  font-size:.76rem;font-weight:700;color:var(--gold);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:.5rem;
+  display:flex;align-items:center;gap:.4rem;
+}
+.ins-row{
+  display:flex;align-items:flex-start;gap:.6rem;
+  padding:.55rem .75rem;border-radius:7px;margin-bottom:.3rem;
+  font-size:.8rem;background:var(--card2);border-left:3px solid transparent;
+}
+.ins-row.spike{border-left-color:var(--green);}
+.ins-row.dip{border-left-color:var(--red);}
+.ins-icon{font-size:1rem;flex-shrink:0;line-height:1;}
+.ins-text{flex:1;color:var(--surface);line-height:1.45;}
+.ins-text strong{color:var(--gold);}
+.ins-meta{font-size:.71rem;color:var(--muted);margin-top:.15rem;}
+.ins-badge{display:inline-block;font-size:.67rem;padding:1px 6px;border-radius:4px;font-weight:700;margin-left:.3rem;}
+.ins-badge.up{background:rgba(76,175,109,.2);color:var(--green);}
+.ins-badge.dn{background:rgba(240,112,112,.2);color:var(--red);}
+.ins-empty{font-size:.78rem;color:var(--muted);padding:.4rem .6rem;}
+.ins-threshold{font-size:.69rem;color:rgba(255,192,0,.4);margin-left:.4rem;}
+
+/* ── DOWNLOAD BUTTON ── */
+.ch-wrap{position:relative;}
+.ch-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;}
+.ch-hdr-label{font-size:.8rem;color:var(--muted);}
+.dl-btn{
+  font-size:.7rem;padding:2px 9px;
+  background:rgba(255,192,0,.12);color:var(--gold);
+  border:1px solid var(--gold-border);border-radius:4px;
+  cursor:pointer;transition:background .15s;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.dl-btn:hover{background:rgba(255,192,0,.28);}
+/* ── MOBILE / PWA ── */
+@media(max-width:600px){
+  .dash-title{font-size:1.1rem;}
+  .section-card{padding:.85rem;}
+  .kpi-value{font-size:1.15rem;}
+  .kpi-value.sm{font-size:.95rem;}
+  .kpi-label{font-size:.62rem;}
+  canvas{max-height:220px;}
+  .mom-table{font-size:.72rem;}
+  .tbtn{font-size:.72rem;padding:3px 9px;}
+}
+/* safe area for iPhone notch */
+body{padding-bottom:env(safe-area-inset-bottom);}
+.dash-header{padding-top:max(1rem,env(safe-area-inset-top));}
+
+/* Install modal */
+#installModal{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;padding:1rem;
+}
+#installModal.open{display:flex;}
+.install-box{
+  background:var(--card);border:1px solid var(--gold-border);
+  border-radius:16px;padding:1.5rem;max-width:380px;width:100%;
+  box-shadow:0 8px 40px rgba(0,0,0,.5);
+}
+.install-box h5{color:var(--gold);font-weight:700;margin-bottom:1rem;}
+.install-step{
+  display:flex;align-items:flex-start;gap:.75rem;
+  margin-bottom:.85rem;font-size:.88rem;color:var(--surface);
+}
+.install-step-num{
+  min-width:26px;height:26px;border-radius:50%;
+  background:var(--gold);color:#1a1a1a;font-weight:700;
+  font-size:.8rem;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.install-step-text{line-height:1.5;}
+.install-step-text em{color:var(--gold);font-style:normal;font-weight:600;}
+.install-note{font-size:.75rem;color:var(--muted);margin-top:.5rem;padding-top:.75rem;border-top:1px solid var(--gold-border);}
+/* ── DEBUG ── */
+#debugPanel{
+  background:#0d0d0d;border:1px solid var(--gold-border);
+  border-radius:8px;padding:1rem;font-size:.75rem;color:var(--muted);
+  margin-top:1rem;max-height:300px;overflow-y:auto;font-family:monospace;
+}
+.debug-ok{color:var(--green);}
+.debug-warn{color:var(--gold);}
+.debug-err{color:var(--red);}
+</style>
+</head>
+<body>
+
+<div class="dash-header">
+  <div class="container-fluid px-4">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="dash-title">🎵 JazzCash DFS KPI Dashboard</div>
+        <div class="dash-subtitle">MTD Comparative Analytics · SheetJS + Chart.js</div>
+      </div>
+      <div class="col-auto">
+        <button class="tbtn" style="font-size:.78rem;" onclick="document.getElementById('installModal').classList.add('open')">📱 Install App</button>
+      </div>
+      <div class="col-auto" id="headerMonths" style="display:none;">
+        <span class="badge me-1" style="background:rgba(255,192,0,.2);color:var(--gold);border:1px solid var(--gold-border);" id="hm1"></span>
+        <span class="badge me-1" style="background:rgba(255,192,0,.35);color:var(--gold);border:1px solid var(--gold-border);" id="hm2"></span>
+        <span class="badge" style="background:var(--gold);color:#141414;font-weight:700;" id="hm3"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container-fluid px-4 py-3">
+
+<!-- shown only in pre-loaded shared snapshots -->
+<div id="sharedBanner" style="display:none;background:rgba(255,192,0,.12);border:1px solid rgba(255,192,0,.35);border-radius:8px;padding:.65rem 1rem;margin-bottom:1rem;font-size:.82rem;color:var(--gold);">
+  📤 <strong>Shared snapshot</strong> — data is embedded in this file. No Excel upload needed.
+  <span style="color:var(--muted);margin-left:.5rem;">Generated: <span id="snapshotDate"></span></span>
+</div>
+
+<!-- FILE UPLOAD -->
+<div class="section-card">
+  <div class="section-title">📁 Load Data Files</div>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="upload-zone" id="zone1">
+        <div class="label">Month 1 — End of Month</div>
+        <div class="month-name" id="mn1">Not loaded</div>
+        <div class="fwrap mt-2"><span class="fbtn">Choose .xlsx File</span><input type="file" accept=".xlsx,.xls" onchange="handleFile(this,0)"></div>
+        <div class="mt-2" id="prog1" style="display:none;"><div class="pbar" id="pb1" style="width:0%"></div></div>
+        <div class="mt-1" id="fname1" style="font-size:.75rem;color:var(--muted);"></div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="upload-zone" id="zone2">
+        <div class="label">Month 2 — End of Month</div>
+        <div class="month-name" id="mn2">Not loaded</div>
+        <div class="fwrap mt-2"><span class="fbtn">Choose .xlsx File</span><input type="file" accept=".xlsx,.xls" onchange="handleFile(this,1)"></div>
+        <div class="mt-2" id="prog2" style="display:none;"><div class="pbar" id="pb2" style="width:0%"></div></div>
+        <div class="mt-1" id="fname2" style="font-size:.75rem;color:var(--muted);"></div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="upload-zone" id="zone3">
+        <div class="label">Current Month — MTD</div>
+        <div class="month-name" id="mn3">Not loaded</div>
+        <div class="fwrap mt-2"><span class="fbtn">Choose .xlsx File</span><input type="file" accept=".xlsx,.xls" onchange="handleFile(this,2)"></div>
+        <div class="mt-2" id="prog3" style="display:none;"><div class="pbar" id="pb3" style="width:0%"></div></div>
+        <div class="mt-1" id="fname3" style="font-size:.75rem;color:var(--muted);"></div>
+      </div>
+    </div>
+  </div>
+  <div class="mt-3 d-flex align-items-center gap-3 flex-wrap">
+    <button id="renderBtn" onclick="renderDashboard()" disabled>▶ Render Dashboard</button>
+    <button class="tbtn" id="shareBtn" style="font-size:.8rem;display:none;" onclick="saveShareable()">📤 Save &amp; Share</button>
+    <span id="fileStatus" style="font-size:.8rem;color:var(--muted);">Load at least 1 file to begin</span>
+    <button class="tbtn" style="font-size:.75rem;" onclick="toggleDebug()">🔍 Debug</button>
+  </div>
+  <div id="debugPanel" style="display:none;"></div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashMain">
+
+  <div class="section-card">
+    <div class="section-title">📊 Executive Summary</div>
+    <div class="row g-3" id="execSummary"></div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-title">👥 Customer Overview <span class="catbadge">Cat 01</span></div>
+    <div class="row g-3 mb-3" id="customerTiles"></div>
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div style="background:var(--card2);border-radius:8px;padding:1rem;">
+          <div class="ch-hdr"><span class="ch-hdr-label">30-Day Active (MAU) — MoM</span><button class="dl-btn" onclick="downloadChartCSV('mauChart','MAU_MoM')">⬇ CSV</button></div>
+          <div class="chart-container"><canvas id="mauChart"></canvas></div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div style="background:var(--card2);border-radius:8px;padding:1rem;">
+          <div class="ch-hdr"><span class="ch-hdr-label">1-Day Active (DAU) — MoM</span><button class="dl-btn" onclick="downloadChartCSV('dauChart','DAU_MoM')">⬇ CSV</button></div>
+          <div class="chart-container"><canvas id="dauChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-3" style="background:var(--card2);border-radius:8px;padding:1rem;">
+      <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+        <div style="font-size:.8rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;">Daily Trend Explorer</div>
+        <div class="d-flex align-items-center gap-2">
+          <label style="font-size:.78rem;color:var(--muted);">Cat:</label>
+          <select class="ds" id="trendCat" onchange="populateTrendKPIs()">
+            <option value="01">Cat 01 — Customer</option>
+            <option value="03">Cat 03 — Transactions</option>
+            <option value="ALL">All</option>
+          </select>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <label style="font-size:.78rem;color:var(--muted);">KPI:</label>
+          <select class="ds" id="trendKPI" onchange="updateTrendExplorer()" style="min-width:200px;"></select>
+        </div>
+      </div>
+      <div class="d-flex justify-content-end mb-1"><button class="dl-btn" onclick="downloadChartCSV('trendChart','Daily_Trend')">⬇ CSV</button></div>
+      <div class="chart-container"><canvas id="trendChart" style="max-height:280px;"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-title">📡 Channel Overview <span class="catbadge">Cat 02</span></div>
+    <div class="row g-3 mb-3" id="channelTiles"></div>
+    <div style="background:var(--card2);border-radius:8px;padding:1rem;">
+      <div class="d-flex justify-content-end mb-1"><button class="dl-btn" onclick="downloadChartCSV('channelChart','Channel_Overview')">⬇ CSV</button></div>
+      <div class="chart-container"><canvas id="channelChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-title">🏆 Top Products <span class="catbadge">Cat 04/05/06/08</span></div>
+    <div class="d-flex gap-2 mb-3 flex-wrap" id="productToggle">
+      <button class="tbtn active" onclick="switchProduct('04','Volume',this)">Volume (04)</button>
+      <button class="tbtn" onclick="switchProduct('05','Value',this)">Value (05)</button>
+      <button class="tbtn" onclick="switchProduct('06','Revenue',this)">Revenue (06)</button>
+      <button class="tbtn" onclick="switchProduct('08','Commissions',this)">Commissions (08)</button>
+    </div>
+    <div style="background:var(--card2);border-radius:8px;padding:1rem;">
+      <div class="d-flex justify-content-end mb-1"><button class="dl-btn" onclick="downloadChartCSV('productChart','Top_Products')">⬇ CSV</button></div>
+      <div class="chart-container"><canvas id="productChart" style="max-height:420px;"></canvas></div>
+    </div>
+    <div id="productInsights" class="mt-3"></div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-title">📋 Month-over-Month Movement</div>
+    <div class="table-responsive">
+      <table class="table table-dark mom-table">
+        <thead><tr>
+          <th>KPI</th><th id="th1">M1</th><th id="th2">M2</th><th id="th3">MTD</th>
+          <th>M1→M2 Δ%</th><th>M2→Curr Δ%</th>
+        </tr></thead>
+        <tbody id="momBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+
+</div><!-- /dashMain -->
+</div><!-- /container -->
+
+<script>
+// ================================================================
+// STATE
+// ================================================================
+const S = { files: [null,null,null], months:['','',''], loaded:[false,false,false], charts:{} };
+
+// ================================================================
+// UTILS
+// ================================================================
+function fmt(n){
+  if(n===null||n===undefined||n===''||isNaN(+n))return'—';
+  const v=+n;
+  if(Math.abs(v)>=1e9)return(v/1e9).toFixed(2)+'B';
+  if(Math.abs(v)>=1e6)return(v/1e6).toFixed(2)+'M';
+  if(Math.abs(v)>=1e3)return(v/1e3).toFixed(1)+'K';
+  return v.toLocaleString();
+}
+function fmtN(n){if(n===null||n===undefined||isNaN(+n))return'—';return(+n).toLocaleString();}
+function pct(a,b){if(a==null||b==null||+b===0)return null;return((+a-+b)/Math.abs(+b))*100;}
+function badge(p,inv=false){
+  if(p===null)return'';
+  const v=+p,good=inv?v<0:v>0;
+  const cls=Math.abs(v)<0.1?'bfl':(good?'bup':'bdn');
+  const sym=v>0?'▲':(v<0?'▼':'—');
+  return`<span class="bdelta ${cls}">${sym} ${Math.abs(v).toFixed(1)}%</span>`;
+}
+function dClass(v,inv=false){
+  if(v==null)return'dflat';
+  const n=+v;if(Math.abs(n)<0.1)return'dflat';
+  return(inv?n<0:n>0)?'dpos':'dneg';
+}
+function dStr(v){if(v==null)return'—';const n=+v;return`${n>0?'▲':n<0?'▼':''}${Math.abs(n).toFixed(1)}%`;}
+function killChart(id){if(S.charts[id]){S.charts[id].destroy();delete S.charts[id];}}
+
+// ================================================================
+// CSV DOWNLOAD
+// ================================================================
+function downloadChartCSV(chartId, filename){
+  const chart=S.charts[chartId];
+  if(!chart){alert('No data to download — render the dashboard first.');return;}
+
+  const labels=chart.data.labels||[];
+  const datasets=chart.data.datasets||[];
+
+  // Header row: first col is the x-axis label name, then one col per dataset
+  const headerCols=['Label',...datasets.map(d=>d.label||'Value')];
+
+  // Data rows
+  const dataRows=labels.map((lbl,i)=>[
+    lbl,
+    ...datasets.map(d=>{
+      const v=d.data[i];
+      return(v===null||v===undefined)?'':v;
+    })
+  ]);
+
+  const escape=v=>`"${String(v).replace(/"/g,'""')}"`;
+  const csv=[headerCols,...dataRows].map(row=>row.map(escape).join(',')).join('\r\n');
+
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`${filename}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ISO date key: YYYY-MM-DD
+function toISO(d){
+  if(!d)return null;
+  return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+// Display label: DD-Mon
+function toDisp(d){
+  if(!d)return'';
+  const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return`${d.getDate()}-${M[d.getMonth()]}`;
+}
+// Parse Excel serial to Date
+function serialToDate(n){
+  try{
+    const info=XLSX.SSF.parse_date_code(n);
+    if(info)return new Date(info.y,info.m-1,info.d);
+  }catch(e){}
+  return null;
+}
+
+// ================================================================
+// PARSING
+// ================================================================
+function handleFile(input, slot){
+  const file=input.files[0];if(!file)return;
+  const pb=document.getElementById(`pb${slot+1}`);
+  const pEl=document.getElementById(`prog${slot+1}`);
+  document.getElementById(`fname${slot+1}`).textContent=file.name;
+  pEl.style.display='block';pb.style.width='20%';
+
+  const reader=new FileReader();
+  reader.onload=function(e){
+    pb.style.width='60%';
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      pb.style.width='85%';
+
+      // === RAW DUMP (always shown so we can diagnose) ===
+      dumpRawSheet(ws, slot);
+
+      const parsed=parseSheet(ws);
+      S.files[slot]=parsed;S.loaded[slot]=true;
+      pb.style.width='100%';
+      document.getElementById(`mn${slot+1}`).textContent=parsed.monthLabel;
+      document.getElementById(`zone${slot+1}`).classList.add('loaded');
+      dbg(`<span class="debug-ok">✓ Slot ${slot+1}: "${parsed.monthLabel}" | cats:[${Object.keys(parsed.data).slice(0,5).join(' | ')}] | dates:${parsed.dateCols.length} | rows:${parsed.rowCount}</span>`);
+      dbg(`  hRow=${parsed.hRow} catC=${parsed.catC} kpiC=${parsed.kpiC} metC=${parsed.metC}`);
+      updateStatus();
+    }catch(err){
+      console.error(err);
+      document.getElementById(`fname${slot+1}`).textContent='❌ '+err.message;
+      pb.style.background='#dc3545';
+      dbg(`<span class="debug-err">✗ Slot ${slot+1} error: ${err.message}</span>`);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function dumpRawSheet(ws, slot){
+  const range=XLSX.utils.decode_range(ws['!ref']||'A1:R20');
+  const maxR=Math.min(range.s.r+10, range.e.r);  // first 10 rows
+  const maxC=Math.min(range.s.c+20, range.e.c);  // first 20 cols
+  dbg(`<span class="debug-warn">--- RAW DUMP Slot ${slot+1} (rows 1-${maxR-range.s.r+1}, cols A-${String.fromCharCode(65+maxC-range.s.c)}) ---</span>`);
+  for(let r=range.s.r;r<=maxR;r++){
+    let rowStr=`R${r+1}: `;
+    for(let c=range.s.c;c<=maxC;c++){
+      const cell=ws[XLSX.utils.encode_cell({r,c})];
+      if(!cell){rowStr+='[null] ';continue;}
+      const t=cell.t; // type: n=number, s=string, d=date, b=bool
+      const v=cell.v;
+      let disp;
+      if(v instanceof Date)disp=`[D:${v.toISOString().slice(0,10)}]`;
+      else if(t==='n')disp=`[N:${v}]`;
+      else if(t==='s')disp=`[S:"${String(v).slice(0,20)}"]`;
+      else disp=`[${t}:${String(v).slice(0,15)}]`;
+      rowStr+=disp+' ';
+    }
+    dbg(rowStr);
+  }
+  dbg(`--- END RAW DUMP ---`);
+}
+
+function parseSheet(ws){
+  const range=XLSX.utils.decode_range(ws['!ref']||'A1:Z700');
+  const rows=[];
+  for(let r=range.s.r;r<=range.e.r;r++){
+    const row=[];
+    for(let c=range.s.c;c<=range.e.c;c++){
+      const cell=ws[XLSX.utils.encode_cell({r,c})];
+      row.push(cell?cell.v:null);
+    }
+    rows.push(row);
+  }
+
+  // ---- FIND HEADER ROW (row containing CAT + KPI) ----
+  let hRow=-1;
+  for(let r=0;r<Math.min(15,rows.length);r++){
+    const upper=rows[r].map(v=>String(v||'').trim().toUpperCase());
+    if(upper.includes('CAT')&&upper.includes('KPI')){hRow=r;break;}
+  }
+  if(hRow===-1)hRow=2;
+
+  // ---- IDENTIFY COLUMN POSITIONS from header row ----
+  const hdr=rows[hRow];
+  let catC=0,kpiC=1,actC=2,metC=3;
+  for(let c=0;c<hdr.length;c++){
+    const h=String(hdr[c]||'').trim().toUpperCase();
+    if(h==='CAT')catC=c;
+    else if(h==='KPI')kpiC=c;
+    else if(h.includes('ACTIV'))actC=c;
+    else if(h==='METRICS'||h==='METRIC')metC=c;
+  }
+
+  // ---- DATE COLUMNS are in the ROW AFTER the header row ----
+  // (Row 4 in the file: null|null|null|REPORT_DATE|2026-02-28|2026-03-01|...)
+  const dateRowIdx=hRow+1;
+  const dateRow=rows[dateRowIdx]||[];
+  const firstDataCol=Math.max(catC,kpiC,actC,metC)+1;
+
+  const dateCols=[];
+  for(let c=firstDataCol;c<dateRow.length;c++){
+    const v=dateRow[c];
+    if(v===null||v===undefined||v==='')continue;
+    let dateObj=null;
+    if(v instanceof Date){
+      dateObj=v;
+    } else if(typeof v==='number'&&v>35000&&v<70000){
+      dateObj=serialToDate(v);
+    } else if(typeof v==='string'){
+      const d=new Date(v);
+      if(!isNaN(d.getTime()))dateObj=d;
+    }
+    if(dateObj){
+      dateCols.push({col:c, key:toISO(dateObj), disp:toDisp(dateObj), dateObj});
+    }
+  }
+
+  // ---- BUILD DATA MAP (data starts 2 rows after header) ----
+  // Metric key = KPI value + " - " + ACTIVITY_TYPE (if present)
+  // CAT is forward-filled (merged cells in col A)
+  const data={};
+  let lastCat='';
+  let rowCount=0;
+
+  for(let r=dateRowIdx+1;r<rows.length;r++){
+    const row=rows[r];
+
+    // Forward-fill CAT
+    const rawCat=String(row[catC]??'').trim();
+    if(rawCat&&rawCat!=='null'&&rawCat!=='undefined')lastCat=rawCat;
+    if(!lastCat)continue;
+
+    const kpi=String(row[kpiC]??'').trim();
+    if(!kpi||kpi==='null')continue;
+
+    const act=String(row[actC]??'').trim();
+    // Build composite metric key: "KPI" or "KPI - ACTIVITY_TYPE"
+    const metKey=(act&&act!=='null'&&act!=='undefined')?`${kpi} - ${act}`:kpi;
+
+    if(!data[lastCat])data[lastCat]={};
+    if(!data[lastCat][metKey])data[lastCat][metKey]={};
+
+    for(const dc of dateCols){
+      const raw=row[dc.col];
+      if(raw===null||raw===undefined||raw==='')continue;
+      const num=raw instanceof Date?NaN:parseFloat(String(raw).replace(/,/g,''));
+      if(!isNaN(num))data[lastCat][metKey][dc.key]=num;
+    }
+    rowCount++;
+  }
+
+  // Month label from the LAST date column
+  // (first date is often the prior month-end baseline; last date is the actual reporting month)
+  let monthLabel='Unknown';
+  if(dateCols.length>0){
+    const ld=dateCols[dateCols.length-1];
+    monthLabel=ld.dateObj.toLocaleString('default',{month:'long',year:'numeric'});
+  }
+
+  const lastDC=dateCols.length?dateCols[dateCols.length-1]:null;
+  return{data,dateCols,lastDC,monthLabel,rowCount,catC,kpiC,actC,metC,hRow};
+}
+
+// ================================================================
+// VALUE LOOKUP
+// ================================================================
+// Get end-of-period value for a metric (last date column value)
+function getVal(slot, metricName){
+  const f=S.files[slot];if(!f)return null;
+  // Search all categories
+  for(const cat of Object.keys(f.data)){
+    const catData=f.data[cat];
+    // Exact match first
+    if(catData[metricName]){
+      const v=f.lastDC?catData[metricName][f.lastDC.key]:null;
+      if(v!==undefined&&v!==null)return v;
+      // Fall back to last available key
+      const keys=Object.keys(catData[metricName]);
+      if(keys.length)return catData[metricName][keys[keys.length-1]];
+    }
+  }
+  // Fuzzy: case-insensitive contains
+  const needle=metricName.toLowerCase().trim();
+  for(const cat of Object.keys(f.data)){
+    for(const mk of Object.keys(f.data[cat])){
+      if(mk.toLowerCase().includes(needle)||needle.includes(mk.toLowerCase())){
+        const v=f.lastDC?f.data[cat][mk][f.lastDC.key]:null;
+        if(v!==undefined&&v!==null)return v;
+        const keys=Object.keys(f.data[cat][mk]);
+        if(keys.length)return f.data[cat][mk][keys[keys.length-1]];
+      }
+    }
+  }
+  return null;
+}
+
+// Get value restricted to a specific category prefix (e.g. "01", "03")
+function getValCat(slot, catPrefix, metricName){
+  const f=S.files[slot];if(!f)return null;
+  const prefix=catPrefix.replace(/^0+/,''); // "01" -> "1", "04" -> "4"
+  for(const cat of Object.keys(f.data)){
+    // Match if cat starts with the prefix digits
+    const catNum=cat.replace(/\D.*$/,'').replace(/^0+/,'');
+    if(catNum!==prefix)continue;
+    const catData=f.data[cat];
+    if(catData[metricName]){
+      const v=f.lastDC?catData[metricName][f.lastDC.key]:null;
+      if(v!==undefined&&v!==null)return v;
+      const keys=Object.keys(catData[metricName]);
+      if(keys.length)return catData[metricName][keys[keys.length-1]];
+    }
+    // Fuzzy within this cat
+    const needle=metricName.toLowerCase();
+    for(const mk of Object.keys(catData)){
+      if(mk.toLowerCase().includes(needle)){
+        const v=f.lastDC?catData[mk][f.lastDC.key]:null;
+        if(v!==undefined&&v!==null)return v;
+        const keys=Object.keys(catData[mk]);
+        if(keys.length)return catData[mk][keys[keys.length-1]];
+      }
+    }
+  }
+  return null;
+}
+
+// Get all daily values for a metric from a specific file (for trend charts)
+function getDailyVals(slot, metricName){
+  const f=S.files[slot];if(!f)return{labels:[],values:[]};
+  for(const cat of Object.keys(f.data)){
+    if(f.data[cat][metricName]){
+      const md=f.data[cat][metricName];
+      const labels=f.dateCols.map(dc=>dc.disp);
+      const values=f.dateCols.map(dc=>md[dc.key]??null);
+      return{labels,values};
+    }
+  }
+  // Fuzzy
+  const needle=metricName.toLowerCase();
+  for(const cat of Object.keys(f.data)){
+    for(const mk of Object.keys(f.data[cat])){
+      if(mk.toLowerCase().includes(needle)){
+        const md=f.data[cat][mk];
+        return{labels:f.dateCols.map(dc=>dc.disp),values:f.dateCols.map(dc=>md[dc.key]??null)};
+      }
+    }
+  }
+  return{labels:[],values:[]};
+}
+
+// Get all metrics under a cat prefix
+function getMetricsForCat(slot, catPrefix){
+  const f=S.files[slot];if(!f)return[];
+  const prefix=catPrefix==='ALL'?null:catPrefix.replace(/^0+/,'');
+  const out=[];
+  for(const cat of Object.keys(f.data)){
+    if(prefix){
+      const cn=cat.replace(/\D.*$/,'').replace(/^0+/,'');
+      if(cn!==prefix)continue;
+    }
+    out.push(...Object.keys(f.data[cat]));
+  }
+  return[...new Set(out)];
+}
+
+// ================================================================
+// STATUS & DEBUG
+// ================================================================
+function updateStatus(){
+  const n=S.loaded.filter(Boolean).length;
+  const btn=document.getElementById('renderBtn');
+  const st=document.getElementById('fileStatus');
+  if(n>=1){btn.removeAttribute('disabled');st.style.color='#4caf7d';}
+  st.textContent=n===3?'✓ All 3 files loaded — click Render Dashboard':`${n}/3 file(s) loaded`;
+}
+function toggleDebug(){
+  const p=document.getElementById('debugPanel');
+  p.style.display=p.style.display==='none'?'block':'none';
+}
+function dbg(html){
+  const p=document.getElementById('debugPanel');
+  p.innerHTML+=html+'<br>';
+  p.style.display='block';
+}
+
+// ================================================================
+// RENDER DASHBOARD
+// ================================================================
+function renderDashboard(){
+  S.months=S.files.map((f,i)=>f?f.monthLabel:`File ${i+1}`);
+  const dash=document.getElementById('dashMain');
+  dash.classList.add('visible');
+
+  // Header badges
+  document.getElementById('headerMonths').style.display='';
+  ['hm1','hm2','hm3'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.textContent=S.months[i]||'';
+    el.style.display=S.months[i]?'':'none';
+  });
+
+  // Table headers
+  document.getElementById('th1').textContent=S.months[0]||'M1';
+  document.getElementById('th2').textContent=S.months[1]||'M2';
+  document.getElementById('th3').textContent=S.months[2]||'MTD';
+
+  dbg(`<span class="debug-ok">--- Render triggered ---</span>`);
+  renderExec();
+  renderCustomer();
+  renderChannel();
+  renderProduct('04','Volume');
+  renderMoM();
+  populateTrendKPIs();
+  dash.scrollIntoView({behavior:'smooth'});
+}
+
+// ================================================================
+// EXEC SUMMARY
+// ================================================================
+function renderExec(){
+  const c=document.getElementById('execSummary');c.innerHTML='';
+  const kpis=[
+    {l:'30-Day Active Overall',            m:'30 Day Active - Overall',                cat:'01'},
+    {l:'Platform Financial Active Monthly',m:'Platform Financial Active Monthly',      cat:'01'},
+    {l:'30-Day App Login Active',          m:'30 day app login active consumer',       cat:'01'},
+    {l:'Overall App Active',               m:'Overall_APP_ACTIVE',                     cat:'01'},
+    {l:'Total Customer Transactions',      m:'Total Customer Transaction',             cat:'03'},
+    {l:'Total Value of Transactions',      m:'Total Value of Transaction',             cat:'05'},
+    {l:'Total Revenue',                    m:'Total Revenue',                          cat:'06'},
+  ];
+  kpis.forEach(k=>{
+    const v0=getValCat(0,k.cat,k.m)??getVal(0,k.m);
+    const v1=getValCat(1,k.cat,k.m)??getVal(1,k.m);
+    const v2=getValCat(2,k.cat,k.m)??getVal(2,k.m);
+    const main=v2??v1??v0;
+    const prev=v2!=null?v1:(v1!=null?v0:null);
+    const dp=pct(main,prev);
+    dbg(`  exec "${k.l}": v0=${v0} v1=${v1} v2=${v2}`);
+    c.innerHTML+=`<div class="col-sm-6 col-lg-4 col-xl">
+      <div class="kpi-card">
+        <div class="kpi-label">${k.l}</div>
+        <div class="kpi-value ${Math.abs(main||0)>=1e7?'sm':''}">${fmt(main)}</div>
+        <div class="mt-1">${badge(dp)}</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:4px;">prev: ${fmt(prev)}</div>
+      </div></div>`;
+  });
+}
+
+// ================================================================
+// CUSTOMER
+// ================================================================
+function renderCustomer(){
+  const tc=document.getElementById('customerTiles');tc.innerHTML='';
+  const tiles=[
+    {l:'New Adds',            m:'New Adds'},
+    {l:'Daily Reactivation',  m:'Daily Reactivation'},
+    {l:'Churn',               m:'Churn', inv:true},
+  ];
+  tiles.forEach(k=>{
+    const v0=getVal(0,k.m);const v1=getVal(1,k.m);const v2=getVal(2,k.m);
+    const main=v2??v1??v0;const prev=v2!=null?v1:(v1!=null?v0:null);
+    const dp=pct(main,prev);
+    tc.innerHTML+=`<div class="col-6 col-md-4">
+      <div class="kpi-card">
+        <div class="kpi-label">${k.l}</div>
+        <div class="kpi-value sm">${fmt(main)}</div>
+        <div class="mt-1">${badge(dp,!!k.inv)}</div>
+      </div></div>`;
+  });
+
+  barChart3('mauChart','30 Day Active - Overall','01');
+  barChart3('dauChart','1 Day Active','01');
+  populateTrendKPIs();
+}
+
+// ================================================================
+// CHANNEL
+// ================================================================
+function renderChannel(){
+  const tc=document.getElementById('channelTiles');tc.innerHTML='';
+  const tiles=[
+    {l:'Active Agents',        m:'Active Agents'},
+    {l:'Net Registered Cust.', m:'Net Registered Customer Base'},
+    {l:'Net Reg. Merchants',   m:'Net Registered Merchants'},
+  ];
+  tiles.forEach(k=>{
+    const v0=getVal(0,k.m);const v1=getVal(1,k.m);const v2=getVal(2,k.m);
+    const main=v2??v1??v0;const prev=v2!=null?v1:(v1!=null?v0:null);
+    tc.innerHTML+=`<div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-label">${k.l}</div>
+        <div class="kpi-value sm">${fmt(main)}</div>
+        <div class="mt-1">${badge(pct(main,prev))}</div>
+      </div></div>`;
+  });
+
+  killChart('channelChart');
+  const metrics=['Active Agents','Net Registered Customer Base','Net Registered Merchants'];
+  const fi=[0,1,2].filter(i=>S.loaded[i]);
+  const labels=fi.map(i=>S.months[i]);
+  const colors=['#9ab4cc','#ffb020','#FFC000'];
+  const datasets=metrics.map((m,mi)=>({
+    label:m,data:fi.map(i=>getVal(i,m)||0),
+    backgroundColor:colors[mi],borderRadius:4,borderWidth:0
+  }));
+  const ctx=document.getElementById('channelChart').getContext('2d');
+  S.charts['channelChart']=new Chart(ctx,{type:'bar',data:{labels,datasets},options:barOpts()});
+}
+
+// ================================================================
+// PRODUCTS
+// ================================================================
+let curProdCat='04',curProdLabel='Volume';
+function switchProduct(cat,label,btn){
+  document.querySelectorAll('#productToggle .tbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  curProdCat=cat;curProdLabel=label;
+  renderProduct(cat,label);
+}
+function renderProduct(catPrefix,label){
+  killChart('productChart');
+  const refSlot=S.loaded[2]?2:S.loaded[1]?1:0;
+  const f=S.files[refSlot];if(!f)return;
+
+  const prefix=catPrefix.replace(/^0+/,'');
+  let metrics=[];
+  for(const cat of Object.keys(f.data)){
+    const cn=cat.replace(/\D.*$/,'').replace(/^0+/,'');
+    if(cn===prefix){metrics=Object.keys(f.data[cat]);break;}
+  }
+  if(!metrics.length){
+    dbg(`<span class="debug-warn">No metrics found for cat prefix ${catPrefix}</span>`);
+    document.getElementById('productInsights').innerHTML='';
+    return;
+  }
+
+  const scored=metrics.map(m=>{
+    const v=getValCat(refSlot,catPrefix,m)||0;
+    return{m,v,v0:getValCat(0,catPrefix,m)||0,v1:getValCat(1,catPrefix,m)||0,v2:getValCat(2,catPrefix,m)||0};
+  }).sort((a,b)=>b.v-a.v).slice(0,15);
+
+  const fi=[0,1,2].filter(i=>S.loaded[i]);
+  const colors=['#9ab4cc','#ffb020','#FFC000'];
+  const datasets=fi.map((i,di)=>({
+    label:S.months[i],
+    data:scored.map(s=>[s.v0,s.v1,s.v2][i]),
+    backgroundColor:colors[di],borderRadius:4,borderWidth:0
+  }));
+  const ylabels=scored.map(s=>s.m.length>38?s.m.slice(0,36)+'…':s.m);
+  const ctx=document.getElementById('productChart').getContext('2d');
+  S.charts['productChart']=new Chart(ctx,{
+    type:'bar',
+    data:{labels:ylabels,datasets},
+    options:{
+      indexAxis:'y',responsive:true,
+      plugins:{
+        legend:{labels:{color:'#F2F2F2',font:{size:11}}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}`}},
+        title:{display:true,text:`Top 15 — ${label}`,color:'#FFC000',font:{size:12}}
+      },
+      scales:{
+        x:{grid:{color:'rgba(255,192,0,.15)'},ticks:{color:'#F2F2F2',callback:v=>fmt(v)}},
+        y:{grid:{color:'rgba(255,192,0,.15)'},ticks:{color:'#F2F2F2',font:{size:10}}}
+      }
+    }
+  });
+
+  renderProductInsights(scored, catPrefix, label);
+}
+
+// ================================================================
+// PRODUCT INSIGHTS — anomaly detection
+// ================================================================
+function stats(arr){
+  const nums=arr.filter(v=>v!==null&&!isNaN(v));
+  if(!nums.length)return{mean:0,std:0,median:0,n:0};
+  const mean=nums.reduce((a,b)=>a+b,0)/nums.length;
+  const std=Math.sqrt(nums.reduce((a,b)=>a+(b-mean)**2,0)/nums.length);
+  const sorted=[...nums].sort((a,b)=>a-b);
+  const median=sorted[Math.floor(sorted.length/2)];
+  return{mean,std,median,n:nums.length};
+}
+
+function renderProductInsights(scored, catPrefix, label){
+  const box=document.getElementById('productInsights');
+  box.innerHTML='';
+
+  // ---- MONTHLY ANOMALIES ----
+  // Compute all MoM % changes; flag products where the change is an outlier
+  const monthlyData=scored.map(s=>{
+    const d12=(s.v0&&s.v1)?((s.v1-s.v0)/Math.abs(s.v0))*100:null;
+    const d23=(s.v1&&s.v2)?((s.v2-s.v1)/Math.abs(s.v1))*100:null;
+    return{m:s.m,d12,d23,v0:s.v0,v1:s.v1,v2:s.v2};
+  });
+
+  // Use the distribution of % changes to set outlier threshold
+  const allPcts=[...monthlyData.map(d=>d.d12),...monthlyData.map(d=>d.d23)].filter(v=>v!==null);
+  const ms=stats(allPcts);
+  // threshold = mean ± 1.5×std, floored at 15% absolute
+  const hiThresh=Math.max(15, ms.mean+1.5*ms.std);
+  const loThresh=Math.min(-15, ms.mean-1.5*ms.std);
+
+  const monthlyAlerts=[];
+  monthlyData.forEach(d=>{
+    [[d.d12,0,1],[d.d23,1,2]].forEach(([chg,fromIdx,toIdx])=>{
+      if(chg===null)return;
+      if(!S.loaded[fromIdx]||!S.loaded[toIdx])return;
+      if(chg>=hiThresh||chg<=loThresh){
+        monthlyAlerts.push({
+          product:d.m, chg,
+          from:S.months[fromIdx]||`M${fromIdx+1}`,
+          to:S.months[toIdx]||`M${toIdx+1}`,
+          vFrom:fromIdx===0?d.v0:fromIdx===1?d.v1:d.v2,
+          vTo:toIdx===1?d.v1:d.v2,
+          type:chg>0?'spike':'dip'
+        });
+      }
+    });
+  });
+  monthlyAlerts.sort((a,b)=>Math.abs(b.chg)-Math.abs(a.chg));
+
+  // ---- DAILY ANOMALIES (current month) ----
+  const dailyAlerts=[];
+  if(S.loaded[2]){
+    const topN=scored.slice(0,8); // check top 8 products daily
+    topN.forEach(s=>{
+      if(s.v2===0)return;
+      const{labels:dayLabels,values:dayVals}=getDailyVals(2,s.m);
+      if(!dayLabels.length)return;
+      // Skip first value (prior month baseline) for stats
+      const dataVals=dayVals.slice(1);
+      const dataLabels=dayLabels.slice(1);
+      const st=stats(dataVals);
+      if(st.n<4||st.std===0)return;
+
+      dataVals.forEach((v,i)=>{
+        if(v===null)return;
+        const z=(v-st.mean)/st.std;
+        if(Math.abs(z)<1.5)return; // only flag >1.5σ
+        dailyAlerts.push({
+          product:s.m, day:dataLabels[i], value:v,
+          mean:st.mean, std:st.std, z,
+          pctFromMean:((v-st.mean)/Math.abs(st.mean))*100,
+          type:z>0?'spike':'dip'
+        });
+      });
+    });
+  }
+
+  // Deduplicate daily: keep worst z-score per product
+  const worstPerProduct={};
+  dailyAlerts.forEach(a=>{
+    if(!worstPerProduct[a.product]||Math.abs(a.z)>Math.abs(worstPerProduct[a.product].z)){
+      worstPerProduct[a.product]=a;
+    }
+  });
+  const dailyTop=Object.values(worstPerProduct).sort((a,b)=>Math.abs(b.z)-Math.abs(a.z));
+
+  // ---- RENDER ----
+  const nMonthly=monthlyAlerts.length;
+  const nDaily=dailyTop.length;
+
+  if(!nMonthly&&!nDaily){
+    box.innerHTML=`<div class="ins-empty">✓ No major deviations detected across products (threshold: >${Math.abs(hiThresh).toFixed(0)}% MoM change or >2σ daily)</div>`;
+    return;
+  }
+
+  const threshNote=`<span class="ins-threshold">(outlier threshold: >${Math.abs(hiThresh).toFixed(0)}% MoM | >2σ daily)</span>`;
+  let html='';
+
+  // Monthly section
+  if(nMonthly){
+    html+=`<div class="ins-section">
+      <div class="ins-header">📅 Monthly Deviations — ${label} ${threshNote}</div>`;
+    monthlyAlerts.forEach(a=>{
+      const sign=a.chg>0?'+':'';
+      const cls=a.type==='spike'?'spike':'dip';
+      const icon=a.type==='spike'?'📈':'📉';
+      const badgeCls=a.chg>0?'up':'dn';
+      html+=`<div class="ins-row ${cls}">
+        <div class="ins-icon">${icon}</div>
+        <div class="ins-text">
+          <strong>${a.product}</strong>
+          <span class="ins-badge ${badgeCls}">${sign}${a.chg.toFixed(1)}%</span>
+          <div class="ins-meta">${a.from} → ${a.to} &nbsp;|&nbsp; ${fmt(a.vFrom)} → <strong>${fmt(a.vTo)}</strong> &nbsp;|&nbsp; Absolute Δ: ${fmt(a.vTo-a.vFrom)}</div>
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+  }
+
+  // Daily section
+  if(nDaily){
+    html+=`<div class="ins-section">
+      <div class="ins-header">📆 Daily Anomalies — Current Month (top products, >2σ from daily mean)</div>`;
+
+    // Also show all individual anomaly days grouped by product
+    const byProduct={};
+    dailyAlerts.forEach(a=>{
+      if(!byProduct[a.product])byProduct[a.product]=[];
+      byProduct[a.product].push(a);
+    });
+
+    Object.entries(byProduct).sort((a,b)=>{
+      const za=Math.max(...a[1].map(x=>Math.abs(x.z)));
+      const zb=Math.max(...b[1].map(x=>Math.abs(x.z)));
+      return zb-za;
+    }).forEach(([prod,alerts])=>{
+      // Group spike days and dip days
+      const spikes=alerts.filter(a=>a.type==='spike').sort((a,b)=>b.z-a.z);
+      const dips=alerts.filter(a=>a.type==='dip').sort((a,b)=>a.z-b.z);
+      const all=[...spikes,...dips];
+      const st=stats([alerts[0].mean]); // just to get mean for display
+      const dailyMean=alerts[0].mean;
+      const dailyStd=alerts[0].std;
+
+      all.forEach(a=>{
+        const sign=a.pctFromMean>0?'+':'';
+        const cls=a.type==='spike'?'spike':'dip';
+        const icon=a.type==='spike'?'⚡':'⬇️';
+        const badgeCls=a.pctFromMean>0?'up':'dn';
+        html+=`<div class="ins-row ${cls}">
+          <div class="ins-icon">${icon}</div>
+          <div class="ins-text">
+            <strong>${a.product}</strong> — <strong>${a.day}</strong>
+            <span class="ins-badge ${badgeCls}">${sign}${a.pctFromMean.toFixed(1)}% vs avg</span>
+            <div class="ins-meta">Value: <strong>${fmt(a.value)}</strong> &nbsp;|&nbsp; Daily avg: ${fmt(dailyMean)} &nbsp;|&nbsp; σ: ${fmt(dailyStd)} &nbsp;|&nbsp; Z-score: ${a.z.toFixed(2)}</div>
+          </div>
+        </div>`;
+      });
+    });
+    html+='</div>';
+  }
+
+  box.innerHTML=html;
+}
+
+// ================================================================
+// MOM TABLE
+// ================================================================
+function renderMoM(){
+  const body=document.getElementById('momBody');body.innerHTML='';
+  const refFile=S.files[2]||S.files[1]||S.files[0];if(!refFile)return;
+
+  const rows=[];
+  const seen=new Set();
+  const targetCats=new Set(['1','3']); // cat01, cat03
+
+  for(const cat of Object.keys(refFile.data)){
+    const cn=cat.replace(/\D.*$/,'').replace(/^0+/,'');
+    if(!targetCats.has(cn))continue;
+    for(const m of Object.keys(refFile.data[cat])){
+      if(seen.has(m))continue;seen.add(m);
+      rows.push({cat,m});
+    }
+  }
+
+  if(!rows.length){
+    // Fallback: show all metrics
+    for(const cat of Object.keys(refFile.data)){
+      for(const m of Object.keys(refFile.data[cat])){
+        if(seen.has(m))continue;seen.add(m);
+        rows.push({cat,m});
+      }
+    }
+  }
+
+  const inv=new Set(['churn','dormant','inactive','failed']);
+  rows.forEach(({cat,m})=>{
+    const v0=getVal(0,m),v1=getVal(1,m),v2=getVal(2,m);
+    if(v0===null&&v1===null&&v2===null)return;
+    const d12=pct(v1,v0),d23=pct(v2,v1);
+    const isInv=inv.has(m.toLowerCase());
+    body.innerHTML+=`<tr>
+      <td><span class="catbadge">${cat.substring(0,5)}</span>${m}</td>
+      <td>${fmtN(v0)}</td><td>${fmtN(v1)}</td><td>${fmtN(v2)}</td>
+      <td class="${dClass(d12,isInv)}">${dStr(d12)}</td>
+      <td class="${dClass(d23,isInv)}">${dStr(d23)}</td>
+    </tr>`;
+  });
+  if(!body.innerHTML)body.innerHTML='<tr><td colspan="6" class="text-center" style="color:var(--muted);">No Cat 01/03 data found</td></tr>';
+}
+
+// ================================================================
+// TREND EXPLORER
+// ================================================================
+function populateTrendKPIs(){
+  const cat=document.getElementById('trendCat').value;
+  const sel=document.getElementById('trendKPI');
+  sel.innerHTML='';
+  const refSlot=S.loaded[2]?2:S.loaded[1]?1:0;
+  const metrics=getMetricsForCat(refSlot,cat);
+  metrics.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
+  if(metrics.length)updateTrendExplorer();
+}
+function updateTrendExplorer(){
+  const m=document.getElementById('trendKPI').value;
+  if(!m)return;
+  killChart('trendChart');
+  const colors=['#9ab4cc','#ffb020','#FFC000'];
+  const datasets=[];
+  [0,1,2].forEach((fi,di)=>{
+    if(!S.loaded[fi])return;
+    const{labels,values}=getDailyVals(fi,m);
+    if(!labels.length)return;
+    datasets.push({
+      label:S.months[fi],data:values,
+      borderColor:colors[di],backgroundColor:`${colors[di]}20`,
+      borderWidth:2,pointRadius:3,fill:false,tension:.3,spanGaps:true
+    });
+  });
+  if(!datasets.length)return;
+  // Use day numbers as x-axis (1, 2, 3...)
+  const maxLen=Math.max(...datasets.map(d=>d.data.length));
+  const xlabels=Array.from({length:maxLen},(_,i)=>i+1);
+  const ctx=document.getElementById('trendChart').getContext('2d');
+  S.charts['trendChart']=new Chart(ctx,{
+    type:'line',
+    data:{labels:xlabels,datasets},
+    options:{...lineOpts(),plugins:{
+      legend:{labels:{color:'rgba(242,242,242,.5)'}},
+      tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}`}},
+      title:{display:true,text:m,color:'#FFC000',font:{size:12}}
+    }}
+  });
+}
+
+// ================================================================
+// SHARED CHART HELPERS
+// ================================================================
+function barChart3(canvasId, metricName, catPrefix){
+  killChart(canvasId);
+  const fi=[0,1,2].filter(i=>S.loaded[i]);
+  const labels=fi.map(i=>S.months[i]);
+  const vals=fi.map(i=>getValCat(i,catPrefix,metricName)||getVal(i,metricName)||0);
+  const colors=['#9ab4cc','#ffb020','#FFC000'];
+  const ctx=document.getElementById(canvasId).getContext('2d');
+  S.charts[canvasId]=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{
+      label:metricName,data:vals,
+      backgroundColor:fi.map((_,di)=>colors[di]),
+      borderRadius:6,borderWidth:0
+    }]},
+    options:barOpts()
+  });
+}
+function barOpts(){
+  return{responsive:true,plugins:{
+    legend:{labels:{color:'#F2F2F2',font:{size:11}}},
+    tooltip:{callbacks:{label:c=>fmt(c.raw)}}
+  },scales:{
+    x:{grid:{color:'rgba(255,192,0,.18)'},ticks:{color:'#cccccc',font:{size:11}}},
+    y:{grid:{color:'rgba(255,192,0,.18)'},ticks:{color:'#cccccc',font:{size:11},callback:v=>fmt(v)}}
+  }};
+}
+function lineOpts(){
+  return{responsive:true,plugins:{
+    legend:{labels:{color:'#F2F2F2',font:{size:11}}},
+    tooltip:{callbacks:{label:c=>fmt(c.raw)}}
+  },scales:{
+    x:{grid:{color:'rgba(255,192,0,.18)'},ticks:{color:'#cccccc',font:{size:11},maxTicksLimit:16}},
+    y:{grid:{color:'rgba(255,192,0,.18)'},ticks:{color:'#cccccc',font:{size:11},callback:v=>fmt(v)}}
+  }};
+}
+
+// ================================================================
+// SAVE & SHARE — embed data into a new self-contained HTML file
+// ================================================================
+function saveShareable(){
+  if(!S.loaded.some(Boolean)){alert('Render the dashboard first.');return;}
+
+  // Serialize state — convert Date objects to ISO strings for JSON safety
+  const serializeFile=f=>{
+    if(!f)return null;
+    const serializeDC=dc=>({...dc,dateObj:dc.dateObj?dc.dateObj.toISOString():null});
+    return{
+      ...f,
+      dateCols:f.dateCols.map(serializeDC),
+      lastDC:f.lastDC?serializeDC(f.lastDC):null
+    };
+  };
+
+  const snapshot={
+    files:S.files.map(serializeFile),
+    months:S.months,
+    loaded:S.loaded,
+    savedAt:new Date().toISOString()
+  };
+
+  // Inject a preload <script> right after <head> in the current page HTML
+  const dataTag=`<script id="__preload__">window.__PRELOADED__=${JSON.stringify(snapshot)};<\/script>`;
+  let html='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+
+  // Remove any previously embedded preload (avoid double-embedding on re-save)
+  html=html.replace(/<script id="__preload__">[\s\S]*?<\/script>/,'');
+  // Clear debug panel noise from the snapshot
+  html=html.replace(/(<div id="debugPanel"[^>]*>)[\s\S]*?(<\/div>)/,
+    (_,open,close)=>open+close);
+  // Inject fresh preload script
+  html=html.replace('<head>','<head>\n'+dataTag);
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`JazzCash_Dashboard_${new Date().toISOString().slice(0,10)}.html`;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+// ================================================================
+// AUTO-RESTORE from embedded preload (shared snapshots)
+// ================================================================
+(function restorePreload(){
+  if(!window.__PRELOADED__)return;
+  const p=window.__PRELOADED__;
+
+  // Show the shared snapshot banner
+  document.getElementById('sharedBanner').style.display='block';
+  const d=new Date(p.savedAt);
+  document.getElementById('snapshotDate').textContent=
+    d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})+
+    ' '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+
+  // Restore Date objects in dateCols
+  p.files.forEach(f=>{
+    if(!f)return;
+    f.dateCols.forEach(dc=>{if(dc.dateObj)dc.dateObj=new Date(dc.dateObj);});
+    if(f.lastDC&&f.lastDC.dateObj)f.lastDC.dateObj=new Date(f.lastDC.dateObj);
+  });
+
+  S.files=p.files;
+  S.months=p.months;
+  S.loaded=p.loaded;
+
+  // Update upload zone UI to reflect pre-loaded files
+  S.files.forEach((f,i)=>{
+    if(!f)return;
+    document.getElementById(`mn${i+1}`).textContent=f.monthLabel;
+    document.getElementById(`zone${i+1}`).classList.add('loaded');
+    document.getElementById(`fname${i+1}`).textContent='(embedded)';
+  });
+
+  updateStatus();
+  // Defer render until all scripts/DOM are ready
+  window.addEventListener('DOMContentLoaded',()=>{
+    renderDashboard();
+    document.getElementById('shareBtn').style.display='inline-block';
+  });
+})();
+
+// Show share button after first render
+const _origRender=renderDashboard;
+renderDashboard=function(){
+  _origRender();
+  document.getElementById('shareBtn').style.display='inline-block';
+};
+
+// ================================================================
+// PWA SETUP — icon, manifest, service worker
+// ================================================================
+(function setupPWA(){
+  // Generate app icon on a canvas
+  function makeIcon(size){
+    const c=document.createElement('canvas');
+    c.width=c.height=size;
+    const ctx=c.getContext('2d');
+    // Rounded rect background
+    const r=size*0.2;
+    ctx.beginPath();
+    ctx.moveTo(r,0);ctx.lineTo(size-r,0);ctx.arcTo(size,0,size,r,r);
+    ctx.lineTo(size,size-r);ctx.arcTo(size,size,size-r,size,r);
+    ctx.lineTo(r,size);ctx.arcTo(0,size,0,size-r,r);
+    ctx.lineTo(0,r);ctx.arcTo(0,0,r,0,r);ctx.closePath();
+    const bg=ctx.createLinearGradient(0,0,size,size);
+    bg.addColorStop(0,'#383838');bg.addColorStop(1,'#3d3200');
+    ctx.fillStyle=bg;ctx.fill();
+    // Subtle gold glow circle
+    ctx.fillStyle='rgba(255,192,0,.18)';
+    ctx.beginPath();ctx.arc(size*.72,size*.28,size*.38,0,Math.PI*2);ctx.fill();
+    // "JC" letters
+    ctx.fillStyle='#FFC000';
+    ctx.font=`bold ${size*.36}px "Segoe UI",Arial,sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('JC',size*.46,size*.5);
+    // Small gold dot accent
+    ctx.beginPath();ctx.arc(size*.76,size*.54,size*.055,0,Math.PI*2);ctx.fill();
+    return c.toDataURL('image/png');
+  }
+
+  // Set apple-touch-icon
+  const icon180=makeIcon(180);
+  const li=document.getElementById('touchIcon');
+  if(li)li.href=icon180;
+
+  // Inject Web App Manifest (needed for Android/Chrome PWA install prompt)
+  try{
+    const manifest={
+      name:'JazzCash DFS KPI Dashboard',short_name:'JazzCash KPI',
+      description:'MTD Comparative Analytics Dashboard',
+      start_url:'.',display:'standalone',
+      background_color:'#2c2c2c',theme_color:'#FFC000',orientation:'any',
+      icons:[
+        {src:icon180,sizes:'180x180',type:'image/png',purpose:'any maskable'},
+        {src:makeIcon(512),sizes:'512x512',type:'image/png',purpose:'any maskable'}
+      ]
+    };
+    const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+    const ml=document.createElement('link');
+    ml.rel='manifest';ml.href=URL.createObjectURL(mBlob);
+    document.head.appendChild(ml);
+  }catch(e){}
+
+  // Register service worker for offline support (HTTPS only)
+  if('serviceWorker' in navigator && location.protocol==='https:'){
+    const sw=`
+const V='jc-v1';
+const URLS=[
+  self.location.href,
+  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css',
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js'
+];
+self.addEventListener('install',e=>e.waitUntil(
+  caches.open(V).then(c=>c.addAll(URLS)).then(()=>self.skipWaiting())
+));
+self.addEventListener('activate',e=>e.waitUntil(clients.claim()));
+self.addEventListener('fetch',e=>e.respondWith(
+  caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{
+    if(res&&res.status===200&&res.type!=='opaque'){
+      const clone=res.clone();
+      caches.open(V).then(c=>c.put(e.request,clone));
+    }
+    return res;
+  }))
+));`;
+    try{
+      const swBlob=new Blob([sw],{type:'text/javascript'});
+      navigator.serviceWorker.register(URL.createObjectURL(swBlob),{scope:'./'}).catch(()=>{});
+    }catch(e){}
+  }
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Install Instructions Modal -->
+<div id="installModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="install-box">
+    <h5>📱 Install on iPhone</h5>
+    <div class="install-step">
+      <div class="install-step-num">1</div>
+      <div class="install-step-text">Use <em>Safari</em> on your iPhone — Chrome and Edge do not support installation on iOS.</div>
+    </div>
+    <div class="install-step">
+      <div class="install-step-num">2</div>
+      <div class="install-step-text">Open this page, then tap the <em>Share</em> button (the box with an arrow ↑) at the bottom of the screen.</div>
+    </div>
+    <div class="install-step">
+      <div class="install-step-num">3</div>
+      <div class="install-step-text">Scroll down in the Share sheet and tap <em>"Add to Home Screen"</em>.</div>
+    </div>
+    <div class="install-step">
+      <div class="install-step-num">4</div>
+      <div class="install-step-text">Confirm the name <em>"JazzCash KPI"</em> and tap <em>Add</em>. The app icon will appear on your home screen.</div>
+    </div>
+    <div class="install-note">
+      ⚠️ The page must be served over <strong>https://</strong> for Add to Home Screen to work — open the shared snapshot link from SharePoint, GitHub Pages, or any hosted URL. A local <code>file://</code> path will not install.<br><br>
+      Once installed, the app opens full-screen with no browser chrome, like a native app.
+    </div>
+    <div class="mt-3 text-end">
+      <button class="tbtn" onclick="document.getElementById('installModal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
